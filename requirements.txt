@@ -9,3 +9,5 @@ six
 pycocotools
 shapely
 opencv-python
+Levenshtein
+regex
