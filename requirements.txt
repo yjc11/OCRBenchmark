@@ -1,0 +1,11 @@
+tqdm
+gradio
+pandas
+openpyxl
+Pillow
+matplotlib
+numpy
+six
+pycocotools
+shapely
+opencv-python

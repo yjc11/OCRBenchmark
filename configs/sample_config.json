@@ -1,0 +1,11 @@
+{
+    "dataset": "data/中广核/ANA",
+    "output": "outputs/ana_ppocr_easyocr",
+    "metadata": null,
+    "engines": [
+        "ppocr",
+        "easyocr"
+    ],
+    "pdf_dpi": 300,
+    "note": "示例配置：对 ANA 目录下所有 PDF/图片使用 PaddleOCR 和 EasyOCR 做基准测试"
+}
