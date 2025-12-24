@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from scoring.score_rec import calculate_cer
+from scoring.rec_metric import calculate_cer
 
 
 def main():
@@ -27,7 +27,7 @@ def main():
         preds.append(pred_value['value'][0])
         labels.append(label_json[pred_name]['value'][0])
     cer, _ = calculate_cer(preds, labels)
-    print(f"Overall CER: {1 - cer}")
+    print(f"Overall CER: {cer}")
 
 
 if __name__ == "__main__":

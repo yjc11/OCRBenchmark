@@ -1,4 +1,5 @@
 # Initialize PaddleOCR instance
+import json 
 import os
 from pathlib import Path
 
@@ -23,9 +24,17 @@ output_dir = Path(output_dir)
 output_dir.mkdir(parents=True, exist_ok=True)
 for img_path in tqdm(Path(test_dir).glob("**/*.png")):
     result = ocr.predict(input=img_path.as_posix())
-    _output_dir = output_dir / img_path.stem
-    _output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    save_result = []
     for i, res in enumerate(result):
-        # res.print()
-        # res.save_to_img(_output_dir)
-        res.save_to_json(_output_dir)
+        polys = res['rec_polys']
+        texts = res['rec_texts']
+        for poly, text in zip(polys, texts):
+            save_result.append({
+                'value': text,
+                'points': poly.tolist(),
+                'category': 'text',
+                'shape': 'polygon',
+            })
+    with open(output_dir / f"{img_path.stem}.json", "w", encoding="utf-8") as f:
+        json.dump(save_result, f, ensure_ascii=False, indent=2)

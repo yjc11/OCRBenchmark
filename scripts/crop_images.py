@@ -160,6 +160,7 @@ def process_single_image2(args):
                     continue
 
                 # 将 points 转换为 tuple 格式: [(x1,y1), (x2,y2), (x3,y3), (x4,y4)]
+                points = np.array(points).reshape(-1, 2)
                 pts_tuple = [tuple(pt) for pt in points]
 
                 # 使用透视变换裁剪图片
@@ -223,7 +224,7 @@ def run_process_single_image1():
 
 
 if __name__ == '__main__':
-    data_dir = Path(r'E:\datasets\CGN\test\test_p1')
+    data_dir = Path(r'E:\datasets\CGN\test\test_p1_det')
     output_dir = Path(r'E:\datasets\CGN\test\test_p1_rec')
     output_dir.mkdir(parents=True, exist_ok=True)
     process_single_image2((data_dir, output_dir))
