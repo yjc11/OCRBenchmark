@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 import tempfile
@@ -9,42 +10,38 @@ from tqdm import tqdm
 # disable paddleocr log
 os.environ["PADDLE_LOG_LEVEL"] = "WARNING"
 
-# Initialize TextRecognition model
-model = TextRecognition(model_name="PP-OCRv5_server_rec")
 
-# Configuration
-test_dir = r"E:\datasets\CGN\test\test_p1_rec\images"  # 修改为你的图片目录
-output_json_path = r"E:\datasets\CGN\test\pp_rec_results.json"  # 输出 JSON 文件路径
+def main():
+    parser = argparse.ArgumentParser(description='Test PP-OCRv5')
+    parser.add_argument('--model_path', type=str)
+    parser.add_argument('--test_dir', type=str)
+    parser.add_argument('--output_json_path', type=str)
+    args = parser.parse_args()
+    model_path = args.model_path
+    test_dir = args.test_dir
+    output_json_path = args.output_json_path
+    model = TextRecognition(model_dir=model_path)
 
-# 存储所有图片的识别结果
-results = {}
+    # Configuration
+    results = {}
+    for img_path in tqdm(list(Path(test_dir).glob("**/*.png")), desc="Processing images"):
+        try:
+            output = model.predict(input=str(img_path), batch_size=1)
+            rec_text = output[0]['rec_text']
+            results[img_path.name] = {"value": [rec_text], "tags": [], 'scene': []}
+        except Exception as e:
+            print(f"Error processing {img_path}: {e}")
+            results[img_path.name] = {"value": [], "tags": [], 'scene': []}
 
-# 遍历图片目录进行识别
-img_paths = list(Path(test_dir).glob("**/*.png"))
-if not img_paths:
-    img_paths = list(Path(test_dir).glob("**/*.jpg"))
-if not img_paths:
-    img_paths = list(Path(test_dir).glob("**/*.jpeg"))
+    output_path = Path(output_json_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
 
-print(f"Found {len(img_paths)} images to process")
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(results, f, ensure_ascii=False, indent=2)
 
-for img_path in tqdm(img_paths, desc="Processing images"):
-    try:
-        # 运行 OCR 识别
-        output = model.predict(input=img_path.as_posix(), batch_size=1)
-        rec_text = output[0]['rec_text']
-        results[img_path.name] = {"value": [rec_text], "tags": []}
-    except Exception as e:
-        print(f"Error processing {img_path}: {e}")
-        # 即使出错也记录，value 为空列表
-        results[img_path.name] = {"value": [], "tags": []}
+    print(f"\nResults saved to: {output_path}")
+    print(f"Total images processed: {len(results)}")
 
-# 保存结果到 JSON 文件
-output_path = Path(output_json_path)
-output_path.parent.mkdir(parents=True, exist_ok=True)
 
-with open(output_path, "w", encoding="utf-8") as f:
-    json.dump(results, f, ensure_ascii=False, indent=2)
-
-print(f"\nResults saved to: {output_path}")
-print(f"Total images processed: {len(results)}")
+if __name__ == "__main__":
+    main()

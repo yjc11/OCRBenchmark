@@ -186,16 +186,14 @@ def create_interface():
         with gr.Row():
             pred_path = gr.Textbox(
                 label="模型预估结果",
-                value=r'E:\datasets\CGN\processed\idp_144_ppocrv5_cropped/ppocrv5_predictions.json',
+                value='/workspace/datasets/test_p1_rec/infer/epoch7_results_rocr.txt',
             )
-            val_dir = gr.Textbox(
-                label="验证集图片目录", value=r'E:\datasets\CGN\processed\idp_144_ppocrv5_cropped\images'
-            )
+            val_dir = gr.Textbox(label="验证集图片目录", value='/workspace/datasets/test_p1_rec/images')
             label_path = gr.Textbox(
                 label="验证集标签文件路径",
-                value=r'E:\datasets\CGN\processed\idp_144_ppocrv5_cropped/phocr_predictions.json',
+                value='/workspace/datasets/test_p1_rec/label.json'
             )
-            scene = gr.Textbox(label='Scene', value='doc')
+            scene = gr.Textbox(label='Scene', value='')
 
         with gr.Row():
             only_diff = gr.Checkbox(label="只显示有差异的样本")
@@ -284,4 +282,4 @@ def trans_api_result_to_json(txt_label_path=None, json_label_path=None):
 
 if __name__ == "__main__":
     demo = create_interface()
-    demo.launch(server_name="localhost", server_port=8800)
+    demo.launch(server_name="localhost", server_port=8507)

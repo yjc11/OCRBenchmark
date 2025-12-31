@@ -1,3 +1,4 @@
+import argparse
 import hashlib
 import json
 from multiprocessing import Pool, cpu_count
@@ -61,55 +62,6 @@ def process_single_image1(args):
 def process_single_image2(args):
     """
     图片和标注文件在同一个目录下，图片名为标注文件的文件名，标注文件为json格式，格式为：
-    [
-      {
-        "category": "text",
-        "value": "性能规范",
-        "shape": "polygon",
-        "points": [
-          [
-            4536.0,
-            96.0
-          ],
-          [
-            4814.0,
-            96.0
-          ],
-          [
-            4814.0,
-            165.0
-          ],
-          [
-            4536.0,
-            165.0
-          ]
-        ]
-      },
-      {
-        "category": "text",
-        "value": "公称压力",
-        "shape": "polygon",
-        "points": [
-          [
-            4074.0,
-            189.0
-          ],
-          [
-            4243.0,
-            189.0
-          ],
-          [
-            4243.0,
-            240.0
-          ],
-          [
-            4074.0,
-            240.0
-          ]
-        ]
-      },
-      ...
-      ]
     """
     label_tool_dir, output_dir = args
     image_output_dir = output_dir / "images"
@@ -223,9 +175,62 @@ def run_process_single_image1():
     print(f"Processed {len(all_crop_record)} cropped images.")
 
 
+def postprocess_label_tool(args):
+    label_tool_dir = Path(args.label_tool_dir)
+    output_dir = Path(args.output_dir)
+    dataset_name = args.dataset_name
+    image_output_dir = output_dir / "Images"
+    image_output_dir.mkdir(parents=True, exist_ok=True)
+    json_output_path = output_dir / "Label.json"
+    json_output_path.touch(exist_ok=True)
+
+    if not label_tool_dir.is_dir():
+        return {}
+
+    ori_image_dir = label_tool_dir / f"Images/{dataset_name}"
+    ori_ocr_label_dir = label_tool_dir / f"Labels/{dataset_name}"
+    all_crop_record = {}
+
+    for ori_ocr_label_file in tqdm(ori_ocr_label_dir.glob("**/*.json"), desc="Processing label tool files"):
+        with open(ori_ocr_label_file, "r", encoding="utf-8") as f:
+            ocr_label_data = json.load(f)
+
+        ori_image_path = ori_image_dir / f"{ori_ocr_label_file.stem}.png"
+        if not ori_image_path.exists():
+            print(f"Image file not found for {ori_ocr_label_file}")
+            continue
+
+        img = Image.open(ori_image_path).convert("RGB")
+        img_np = np.array(img)
+        for item in ocr_label_data:
+            points = item.get("points", [])
+            if len(points) < 4:
+                continue
+            points = np.array(points).reshape(-1, 2)
+            pts_tuple = [tuple(pt) for pt in points]
+            crop_img_np = perspective_transform(img_np, pts_tuple)
+            crop_img = Image.fromarray(crop_img_np)
+            md5 = hashlib.md5()
+            md5.update(np.array(crop_img).tobytes())
+            crop_img_name = f"{md5.hexdigest()}.png"
+            crop_img.save(image_output_dir / crop_img_name)
+            all_crop_record[crop_img_name] = {
+                'value': [item['value']],
+                'tags': [],
+                'scene': [],
+                'from_image': ori_ocr_label_file.stem,
+            }
+
+    with open(json_output_path, "w", encoding="utf-8") as f:
+        json.dump(all_crop_record, f, ensure_ascii=False, indent=2)
+
+    return all_crop_record
+
+
 if __name__ == '__main__':
-    data_dir = Path(r'E:\datasets\CGN\test\test_p1_det')
-    output_dir = Path(r'E:\datasets\CGN\test\test_p1_rec')
-    output_dir.mkdir(parents=True, exist_ok=True)
-    process_single_image2((data_dir, output_dir))
-    pass
+    parser = argparse.ArgumentParser(description='Crop images')
+    parser.add_argument('--label_tool_dir', type=str)
+    parser.add_argument('--output_dir', type=str)
+    parser.add_argument('--dataset_name', type=str)
+    args = parser.parse_args()
+    postprocess_label_tool(args)

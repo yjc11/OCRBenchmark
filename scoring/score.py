@@ -1,121 +1,130 @@
-from .core.std_recog_score import compare
-import os
-import pandas as pd
 import json
+import os
+
+import pandas as pd
+
+from .core.std_recog_score import compare
+
 
 def load_json(filepath):
-    with open(filepath) as f:
-        x = json.load(f)
-    return x
+    with open(filepath, "r", encoding="utf-8") as file_handle:
+        data = json.load(file_handle)
+    return data
+
 
 def compare_two_files(pred, label, mode='normal', exclude_tags=[], use_dp=False):
     assert mode in ['normal', 'baidu']
-    memo = {}
-    memo_rare = {}
-    memo_CN_TW = {}
-    for key in label:
-        items = label[key]
-        label_val = items['value'][-1]
-        scene = items['scene'][-1]
-        tags = items['tags']
+    statistics = {}
+    statistics_rare = {}
+    statistics_cn_tw = {}
+    for sample_id in label:
+        label_item = label[sample_id]
+        label_value = label_item['value'][-1]
+        scene = label_item['scene']
+        if not scene:
+            scene = ''
+        else:
+            scene = scene[-1]
+        tags = label_item['tags']
 
-        exclude = False
+        should_exclude = False
         for tag in exclude_tags:
             if tag in tags:
-                exclude = True
-        if exclude:
+                should_exclude = True
+        if should_exclude:
             continue
 
         try:
-            pred_val = pred[key]['value'][-1]
+            pred_value = pred[sample_id]['value'][-1]
         except:
-            #print('%s not found in submission file' % key)
-            pred_val = ''
+            # print('%s not found in submission file' % sample_id)
+            pred_value = ''
 
         # baidu special treatment
-        if (mode == 'baidu') and (pred_val == '' or pred_val == '##'):
+        if (mode == 'baidu') and (pred_value == '' or pred_value == '##'):
             continue
 
-        score_punc, cer = compare(pred_val, label_val, True, use_dp)
-        score_depunc, _ = compare(pred_val, label_val, False, use_dp)
+        is_match_punc, cer_value = compare(pred_value, label_value, True, use_dp)
+        is_match_depunc, _ = compare(pred_value, label_value, False, use_dp)
 
         if 'rare' in tags:
-            if scene not in memo_rare:
-                memo_rare[scene] = {'N' : 0, 'N_punc' : 0, 'N_depunc' : 0, 'cer':0, 'result' : []}
-            memo_rare[scene]['N'] += 1
-            memo_rare[scene]['N_punc'] += score_punc
-            memo_rare[scene]['N_depunc'] += score_depunc
-            memo_rare[scene]['cer'] += cer
-            memo_rare[scene]['result'].append([label_val, pred_val])
+            if scene not in statistics_rare:
+                statistics_rare[scene] = {'N': 0, 'N_punc': 0, 'N_depunc': 0, 'cer': 0, 'result': []}
+            statistics_rare[scene]['N'] += 1
+            statistics_rare[scene]['N_punc'] += is_match_punc
+            statistics_rare[scene]['N_depunc'] += is_match_depunc
+            statistics_rare[scene]['cer'] += cer_value
+            statistics_rare[scene]['result'].append([label_value, pred_value])
         elif 'CN-TW' in tags:
-            if scene not in memo_CN_TW:
-                memo_CN_TW[scene] = {'N' : 0, 'N_punc' : 0, 'N_depunc' : 0, 'cer':0, 'result' : []}
-            memo_CN_TW[scene]['N'] += 1
-            memo_CN_TW[scene]['N_punc'] += score_punc
-            memo_CN_TW[scene]['N_depunc'] += score_depunc
-            memo_CN_TW[scene]['cer'] += cer
-            memo_CN_TW[scene]['result'].append([label_val, pred_val])
+            if scene not in statistics_cn_tw:
+                statistics_cn_tw[scene] = {'N': 0, 'N_punc': 0, 'N_depunc': 0, 'cer': 0, 'result': []}
+            statistics_cn_tw[scene]['N'] += 1
+            statistics_cn_tw[scene]['N_punc'] += is_match_punc
+            statistics_cn_tw[scene]['N_depunc'] += is_match_depunc
+            statistics_cn_tw[scene]['cer'] += cer_value
+            statistics_cn_tw[scene]['result'].append([label_value, pred_value])
         else:
-            if scene not in memo:
-                memo[scene] = {'N' : 0, 'N_punc' : 0, 'N_depunc' : 0, 'cer':0, 'result' : []}
-            memo[scene]['N'] += 1
-            memo[scene]['N_punc'] += score_punc
-            memo[scene]['N_depunc'] += score_depunc
-            memo[scene]['cer'] += cer
-            memo[scene]['result'].append([label_val, pred_val])
-    return memo, memo_rare, memo_CN_TW
+            if scene not in statistics:
+                statistics[scene] = {'N': 0, 'N_punc': 0, 'N_depunc': 0, 'cer': 0, 'result': []}
+            statistics[scene]['N'] += 1
+            statistics[scene]['N_punc'] += is_match_punc
+            statistics[scene]['N_depunc'] += is_match_depunc
+            statistics[scene]['cer'] += cer_value
+            statistics[scene]['result'].append([label_value, pred_value])
+    return statistics, statistics_rare, statistics_cn_tw
 
-def pandas_table(memo):
-    panda = []
-    N = 0
-    N_punc = 0
-    N_depunc = 0
-    N_cer = 0
-    N_gt = 0
-    UNK = '[unk]'
-    for key in memo:
-        N_key = memo[key]['N']
-        N_punc_key = memo[key]['N_punc']
-        N_depunc_key = memo[key]['N_depunc']
-        N_cer_key = memo[key]['cer']
-        N += N_key
-        N_punc += N_punc_key
-        N_depunc += N_depunc_key
-        N_cer += N_cer_key
-        
-        N_gt += sum((len(r[0]) for r in memo[key]['result']))
-        line = [key, N_key, N_punc_key, N_depunc_key, N_cer_key, N_gt]
-        panda.append(line)
-        
-    panda.append(['总和', N, N_punc, N_depunc, N_cer, N_gt])
-    df = pd.DataFrame(panda)
-    df.columns = ['scene', 'N', 'N_punc', 'N_depunc', 'N_cer', 'N_gt']
-    df['acc_punc'] = df['N_punc'] / df['N']
-    df['acc_depunc'] = df['N_depunc'] / df['N']
-    df['avg_cer'] = df['N_cer'] / df['N']
-    df['whole_cer'] = df['N_cer'] / df['N_gt']
+
+def pandas_table(statistics):
+    data_rows = []
+    total_count = 0
+    total_correct_punc = 0
+    total_correct_depunc = 0
+    total_cer = 0
+    total_gt_length = 0
+    for scene_key in statistics:
+        scene_count = statistics[scene_key]['N']
+        scene_correct_punc = statistics[scene_key]['N_punc']
+        scene_correct_depunc = statistics[scene_key]['N_depunc']
+        scene_cer = statistics[scene_key]['cer']
+        total_count += scene_count
+        total_correct_punc += scene_correct_punc
+        total_correct_depunc += scene_correct_depunc
+        total_cer += scene_cer
+
+        total_gt_length += sum((len(result_pair[0]) for result_pair in statistics[scene_key]['result']))
+        row = [scene_key, scene_count, scene_correct_punc, scene_correct_depunc, scene_cer, total_gt_length]
+        data_rows.append(row)
+
+    data_rows.append(['总和', total_count, total_correct_punc, total_correct_depunc, total_cer, total_gt_length])
+    df = pd.DataFrame(data_rows)
+    df.columns = ['scene', 'count', 'correct_count_punc', 'correct_count_depunc', 'total_cer', 'gt_length']
+    df['acc_punc'] = df['correct_count_punc'] / df['count']
+    df['acc_depunc'] = df['correct_count_depunc'] / df['count']
+    df['avg_cer'] = df['total_cer'] / df['count']
+    df['whole_cer'] = df['total_cer'] / df['gt_length']
     return df
+
 
 def score(submission_path, label_path, mode, exclude_tags=[], use_dp=False):
     label = load_json(label_path)
     pred = load_json(submission_path)
-    memo, memo_rare, memo_CN_TW = compare_two_files(pred, label, mode, exclude_tags, use_dp)
-    df = pandas_table(memo)
-    df_rare = pandas_table(memo_rare)
-    df_CN_TW = pandas_table(memo_CN_TW)
+    statistics, statistics_rare, statistics_cn_tw = compare_two_files(pred, label, mode, exclude_tags, use_dp)
+    df = pandas_table(statistics)
+    df_rare = pandas_table(statistics_rare)
+    df_cn_tw = pandas_table(statistics_cn_tw)
 
-    if len(memo) > 0:
+    if len(statistics) > 0:
         print('*' * 25)
         print('常见字')
         print(df)
 
-    if len(memo_rare) > 0:
+    if len(statistics_rare) > 0:
         print('*' * 25)
         print('生僻字')
         print(df_rare)
 
-    if len(memo_CN_TW) > 0:
+    if len(statistics_cn_tw) > 0:
         print('*' * 25)
         print('繁体字')
-        print(df_CN_TW)
-    return df, df_rare, df_CN_TW
+        print(df_cn_tw)
+    return df, df_rare, df_cn_tw

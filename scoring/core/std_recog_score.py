@@ -6,7 +6,8 @@ import os
 from .label_replace import replaceFullToHalf
 
 # punctuation = "、·。·`.,;:/(){}?-+~'\"|—*"
-punctuation = "、·。·`.,;:/(){}?-+~'\"|—*《》<>…【】〔〕〈〉（）[]_￣ˉ"
+punctuation = "、·。·`.,;:/()]{}?-+~'\"|—*《》<>…【】〔〕〈〉（）[]_￣ˉ"
+exclude_str= ["【删除线】"]
 
 def levenshteinDistance(s1, s2):
     if len(s1) > len(s2):
